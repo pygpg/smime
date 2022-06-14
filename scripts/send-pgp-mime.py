@@ -58,13 +58,17 @@ def read_file(filename=None, encoding='us-ascii'):
         return _codecs.open(filename, 'r', encoding).read()
     raise ValueError('neither filename nor descriptor given for reading')
 
+
 def load_attachment(filename, encoding='us-ascii'):
-    mimetype,content_encoding = _mimetypes.guess_type(filename)
+    mimetype, content_encoding = _mimetypes.guess_type(filename)
     if mimetype is None or content_encoding is not None:
         mimetype = 'application/octet-stream'
-    maintype,subtype = mimetype.split('/', 1)
-    _pgp_mime.LOG.info('loading attachment {} as {} ({})'.format(
-            filename, mimetype, content_encoding))
+    maintype, subtype = mimetype.split('/', 1)
+    _pgp_mime.LOG.info(
+        'loading attachment {} as {} ({})'.format(
+            filename, mimetype, content_encoding
+        )
+    )
     if maintype == 'text':
         text = read_file(filename=filename, encoding=encoding)
         attachment = _pgp_mime.encodedMIMEText(text)
@@ -81,7 +85,8 @@ def load_attachment(filename, encoding='us-ascii'):
             attachment = _MIMENonMultipary(maintype, subtype)
             attachment.set_payload(data, _encode_base64)
     attachment.add_header(
-        'Content-Disposition', 'attachment', filename=filename)
+        'Content-Disposition', 'attachment', filename=filename
+    )
     return attachment
 
 
@@ -90,46 +95,77 @@ if __name__ == '__main__':
 
     doc_lines = __doc__.splitlines()
     parser = argparse.ArgumentParser(
-        description = doc_lines[0],
-        epilog = '\n'.join(doc_lines[1:]).strip(),
+        description=doc_lines[0],
+        epilog='\n'.join(doc_lines[1:]).strip(),
         version=_pgp_mime.__version__,
-        formatter_class=argparse.RawDescriptionHelpFormatter)
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
     parser.add_argument(
-        '-e', '--encoding', metavar='ENCODING', default='utf-8',
-        help='encoding for input files')
+        '-e',
+        '--encoding',
+        metavar='ENCODING',
+        default='utf-8',
+        help='encoding for input files',
+    )
     parser.add_argument(
-        '-H', '--header-file', metavar='FILE',
-        help='file containing email header')
+        '-H',
+        '--header-file',
+        metavar='FILE',
+        help='file containing email header',
+    )
     parser.add_argument(
-        '-B', '--body-file', metavar='FILE',
-        help='file containing email body')
+        '-B', '--body-file', metavar='FILE', help='file containing email body'
+    )
     parser.add_argument(
-        '-a', '--attachment', metavar='FILE', action='append',
-        help='add an attachment to your message')
+        '-a',
+        '--attachment',
+        metavar='FILE',
+        action='append',
+        help='add an attachment to your message',
+    )
     parser.add_argument(
-        '-m', '--mode', default='sign', metavar='MODE',
+        '-m',
+        '--mode',
+        default='sign',
+        metavar='MODE',
         choices=['sign', 'encrypt', 'sign-encrypt', 'plain'],
-        help='encryption mode')
+        help='encryption mode',
+    )
     parser.add_argument(
-        '-s', '--sign-as', metavar='KEY',
-        help="gpg key to sign with (gpg's -u/--local-user)")
+        '-s',
+        '--sign-as',
+        metavar='KEY',
+        help="gpg key to sign with (gpg's -u/--local-user)",
+    )
     parser.add_argument(
-        '-c', '--config', metavar='FILE',
-        default=_os_path.expanduser(_os_path.join(
-                '~', '.config', 'smtplib.conf')),
-        help='SMTP config file for sending mail'),
+        '-c',
+        '--config',
+        metavar='FILE',
+        default=_os_path.expanduser(
+            _os_path.join('~', '.config', 'smtplib.conf')
+        ),
+        help='SMTP config file for sending mail',
+    ),
     parser.add_argument(
-        '--output', action='store_const', const=True,
-        help="don't mail the generated message, print it to stdout instead")
+        '--output',
+        action='store_const',
+        const=True,
+        help="don't mail the generated message, print it to stdout instead",
+    )
     parser.add_argument(
-        '-V', '--verbose', default=0, action='count',
-        help='increment verbosity')
+        '-V',
+        '--verbose',
+        default=0,
+        action='count',
+        help='increment verbosity',
+    )
 
     args = parser.parse_args()
 
     if args.verbose:
-        _pgp_mime.LOG.setLevel(max(
-                _logging.DEBUG, _pgp_mime.LOG.level - 10*args.verbose))
+        _pgp_mime.LOG.setLevel(
+            max(_logging.DEBUG, _pgp_mime.LOG.level - 10 * args.verbose)
+        )
 
     header_text = read_file(filename=args.header_file, encoding=args.encoding)
     header = _pgp_mime.header_from_text(header_text)
@@ -141,22 +177,26 @@ if __name__ == '__main__':
         body = b
         _mimetypes.init()
         for attachment in args.attachment:
-            body.attach(load_attachment(
-                    filename=attachment, encoding=args.encoding))
+            body.attach(
+                load_attachment(filename=attachment, encoding=args.encoding)
+            )
     if args.sign_as:
         signers = [args.sign_as]
     else:
         signers = None
     if 'encrypt' in args.mode:
-        recipients = [email for name,email in _pgp_mime.email_targets(header)]
+        recipients = [email for name, email in _pgp_mime.email_targets(header)]
     if args.mode == 'sign':
         body = _pgp_mime.sign(body, signers=signers, allow_default_signer=True)
     elif args.mode == 'encrypt':
         body = _pgp_mime.encrypt(body, recipients=recipients)
     elif args.mode == 'sign-encrypt':
         body = _pgp_mime.sign_and_encrypt(
-            body, signers=signers, recipients=recipients,
-            allow_default_signer=True)
+            body,
+            signers=signers,
+            recipients=recipients,
+            allow_default_signer=True,
+        )
     elif args.mode == 'plain':
         pass
     else:

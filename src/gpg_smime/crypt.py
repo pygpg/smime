@@ -4,10 +4,10 @@ import codecs as _codecs
 import logging as _logging
 import os as _os
 import os.path as _os_path
-from _socket import socket as _Socket
 import socket as _socket
 import subprocess as _subprocess
 
+from _socket import socket as _Socket
 from pyassuan import client as _client
 from pyassuan import common as _common
 
@@ -23,20 +23,26 @@ def connect(client, filename, **kwargs):
         client.output = socket.makefile('wb')
     else:
         p = _subprocess.Popen(
-            filename, stdin=_subprocess.PIPE, stdout=_subprocess.PIPE,
-            close_fds=True, **kwargs)
+            filename,
+            stdin=_subprocess.PIPE,
+            stdout=_subprocess.PIPE,
+            close_fds=True,
+            **kwargs
+        )
         client.input = p.stdout
         client.output = p.stdin
         socket = p
     client.connect()
     return socket
 
+
 def get_client(**kwargs):
     client = _client.AssuanClient(name='pgp-mime', close_on_disconnect=True)
     client.logger.setLevel(_logging.DEBUG)
     socket = connect(client, '~/src/gpgme/build/src/gpgme-tool', **kwargs)
-    #socket = connect(client, '~/.assuan/S.gpgme-tool', **kwargs)
+    # socket = connect(client, '~/.assuan/S.gpgme-tool', **kwargs)
     return (client, socket)
+
 
 def disconnect(client, socket):
     client.make_request(_common.Request('BYE'))
@@ -74,9 +80,14 @@ def _write(fd, data):
         i += _os.write(fd, data[i:])
 
 
-def sign_and_encrypt_bytes(data, signers=None, recipients=None,
-                           always_trust=False, mode='detach',
-                           allow_default_signer=False):
+def sign_and_encrypt_bytes(
+    data,
+    signers=None,
+    recipients=None,
+    always_trust=False,
+    mode='detach',
+    allow_default_signer=False,
+):
     r"""Sign ``data`` with ``signers`` and encrypt to ``recipients``.
 
     Just sign:
@@ -102,9 +113,9 @@ def sign_and_encrypt_bytes(data, signers=None, recipients=None,
     ... # doctest: +ELLIPSIS
     b'-----BEGIN PGP MESSAGE-----\n...-----END PGP MESSAGE-----\n'
     """
-    input_read,input_write = _os.pipe()
-    output_read,output_write = _os.pipe()
-    client,socket = get_client(pass_fds=(input_read, output_write))
+    input_read, input_write = _os.pipe()
+    output_read, output_write = _os.pipe()
+    client, socket = get_client(pass_fds=(input_read, output_write))
     _os.close(input_read)
     _os.close(output_write)
     try:
@@ -116,9 +127,11 @@ def sign_and_encrypt_bytes(data, signers=None, recipients=None,
             for recipient in recipients:
                 client.make_request(_common.Request('RECIPIENT', recipient))
         client.make_request(
-            _common.Request('INPUT', 'FD={}'.format(input_read)))
+            _common.Request('INPUT', 'FD={}'.format(input_read))
+        )
         client.make_request(
-            _common.Request('OUTPUT', 'FD={}'.format(output_write)))
+            _common.Request('OUTPUT', 'FD={}'.format(output_write))
+        )
         parameters = []
         if signers or allow_default_signer:
             if recipients:
@@ -135,8 +148,7 @@ def sign_and_encrypt_bytes(data, signers=None, recipients=None,
         _write(input_write, data)
         _os.close(input_write)
         input_write = -1
-        client.make_request(
-            _common.Request(command, ' '.join(parameters)))
+        client.make_request(_common.Request(command, ' '.join(parameters)))
         d = _read(output_read)
     finally:
         disconnect(client, socket)
@@ -168,17 +180,19 @@ def decrypt_bytes(data):
     >>> decrypt_bytes(b)
     b'Success!\n'
     """
-    input_read,input_write = _os.pipe()
-    output_read,output_write = _os.pipe()
-    client,socket = get_client(pass_fds=(input_read, output_write))
+    input_read, input_write = _os.pipe()
+    output_read, output_write = _os.pipe()
+    client, socket = get_client(pass_fds=(input_read, output_write))
     _os.close(input_read)
     _os.close(output_write)
     try:
         hello(client)
         client.make_request(
-            _common.Request('INPUT', 'FD={}'.format(input_read)))
+            _common.Request('INPUT', 'FD={}'.format(input_read))
+        )
         client.make_request(
-            _common.Request('OUTPUT', 'FD={}'.format(output_write)))
+            _common.Request('OUTPUT', 'FD={}'.format(output_write))
+        )
         _write(input_write, data)
         _os.close(input_write)
         input_write = -1
@@ -190,6 +204,7 @@ def decrypt_bytes(data):
             if fd >= 0:
                 _os.close(fd)
     return d
+
 
 def verify_bytes(data, signature=None, always_trust=False):
     r"""Verify a signature on ``data``, possibly decrypting first.
@@ -292,17 +307,17 @@ def verify_bytes(data, signature=None, always_trust=False):
     </gpgme>
     <BLANKLINE>
     """
-    input_read,input_write = _os.pipe()
+    input_read, input_write = _os.pipe()
     pass_fds = [input_read]
     if signature:
-        message_read,message_write = _os.pipe()
+        message_read, message_write = _os.pipe()
         output_read = -1
         pass_fds.append(message_read)
     else:
         message_write = -1
-        output_read,output_write = _os.pipe()
+        output_read, output_write = _os.pipe()
         pass_fds.append(output_write)
-    client,socket = get_client(pass_fds=pass_fds)
+    client, socket = get_client(pass_fds=pass_fds)
     _os.close(input_read)
     if signature:
         _os.close(message_read)
@@ -312,13 +327,16 @@ def verify_bytes(data, signature=None, always_trust=False):
     try:
         hello(client)
         client.make_request(
-            _common.Request('INPUT', 'FD={}'.format(input_read)))
+            _common.Request('INPUT', 'FD={}'.format(input_read))
+        )
         if signature:
             client.make_request(
-                _common.Request('MESSAGE', 'FD={}'.format(message_read)))
+                _common.Request('MESSAGE', 'FD={}'.format(message_read))
+            )
         else:
             client.make_request(
-                _common.Request('OUTPUT', 'FD={}'.format(output_write)))
+                _common.Request('OUTPUT', 'FD={}'.format(output_write))
+            )
         if signature:
             _write(input_write, signature)
             _os.close(input_write)
@@ -335,7 +353,7 @@ def verify_bytes(data, signature=None, always_trust=False):
             plain = data
         else:
             plain = _read(output_read)
-        rs,result = client.make_request(_common.Request('RESULT'))
+        rs, result = client.make_request(_common.Request('RESULT'))
         verified = True
         for line in result.splitlines():
             if b'<status ' in line and b'Success' not in line:

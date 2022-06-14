@@ -1,15 +1,15 @@
 # Copyright
 
-from email import message_from_bytes as _message_from_bytes
-from email.encoders import encode_7or8bit as _encode_7or8bit
-from email.mime.application import MIMEApplication as _MIMEApplication
-from email.mime.multipart import MIMEMultipart as _MIMEMultipart
+from email import message_from_bytes
+from email.encoders import encode_7or8bit
+from email.mime.application import MIMEApplication
+from email.mime.multipart import MIMEMultipart
 
-from . import LOG as _LOG
-from .crypt import sign_and_encrypt_bytes as _sign_and_encrypt_bytes
-from .crypt import verify_bytes as _verify_bytes
-from .email import email_targets as _email_targets
-from .email import strip_bcc as _strip_bcc
+from . import LOG
+from .crypt import sign_and_encrypt_bytes
+from .crypt import verify_bytes
+from .email import email_targets
+from .email import strip_bcc
 
 
 def sign(message, signers=None, allow_default_signer=False):
@@ -19,8 +19,8 @@ def sign(message, signers=None, allow_default_signer=False):
     +-> text/plain                 (body)
     +-> application/pgp-signature  (signature)
 
-    >>> from pgp_mime.email import encodedMIMEText
-    >>> message = encodedMIMEText('Hi\nBye')
+    >>> from pgp_mime.email import encoded_mime_text
+    >>> message = encoded_mime_text('Hi\nBye')
     >>> signed = sign(message, signers=['pgp-mime@invalid.com'])
     >>> signed.set_boundary('boundsep')
     >>> print(signed.as_string())  # doctest: +ELLIPSIS, +REPORT_UDIFF
@@ -50,8 +50,8 @@ def sign(message, signers=None, allow_default_signer=False):
 
     >>> from email.mime.multipart import MIMEMultipart
     >>> message = MIMEMultipart()
-    >>> message.attach(encodedMIMEText('Part A'))
-    >>> message.attach(encodedMIMEText('Part B'))
+    >>> message.attach(encoded_mime_text('Part A'))
+    >>> message.attach(encoded_mime_text('Part B'))
     >>> signed = sign(message, signers=['pgp-mime@invalid.com'])
     >>> signed.set_boundary('boundsep')
     >>> print(signed.as_string())  # doctest: +ELLIPSIS, +REPORT_UDIFF
@@ -91,22 +91,30 @@ def sign(message, signers=None, allow_default_signer=False):
     --boundsep--
     """
     body = message.as_string().encode('us-ascii')
-    signature = str(_sign_and_encrypt_bytes(
-            data=body, signers=signers,
-            allow_default_signer=allow_default_signer), 'us-ascii')
-    sig = _MIMEApplication(
+    signature = str(
+        sign_and_encrypt_bytes(
+            data=body,
+            signers=signers,
+            allow_default_signer=allow_default_signer,
+        ),
+        'us-ascii',
+    )
+    sig = MIMEApplication(
         _data=signature,
         _subtype='pgp-signature; name="signature.asc"',
-        _encoder=_encode_7or8bit)
+        _encoder=encode_7or8bit,
+    )
     sig['Content-Description'] = 'OpenPGP digital signature'
     sig.set_charset('us-ascii')
 
-    msg = _MIMEMultipart(
-        'signed', micalg='pgp-sha1', protocol='application/pgp-signature')
+    msg = MIMEMultipart(
+        'signed', micalg='pgp-sha1', protocol='application/pgp-signature'
+    )
     msg.attach(message)
     msg.attach(sig)
     msg['Content-Disposition'] = 'inline'
     return msg
+
 
 def encrypt(message, recipients=None, always_trust=True):
     r"""Encrypt a ``Message``, returning the encrypted version.
@@ -115,8 +123,8 @@ def encrypt(message, recipients=None, always_trust=True):
     +-> application/pgp-encrypted  (control information)
     +-> application/octet-stream   (body)
 
-    >>> from pgp_mime.email import encodedMIMEText
-    >>> message = encodedMIMEText('Hi\nBye')
+    >>> from pgp_mime.email import encoded_mime_text
+    >>> message = encoded_mime_text('Hi\nBye')
     >>> message['To'] = 'pgp-mime-test <pgp-mime@invalid.com>'
     >>> encrypted = encrypt(message)
     >>> encrypted.set_boundary('boundsep')
@@ -146,8 +154,8 @@ def encrypt(message, recipients=None, always_trust=True):
 
     >>> from email.mime.multipart import MIMEMultipart
     >>> message = MIMEMultipart()
-    >>> message.attach(encodedMIMEText('Part A'))
-    >>> message.attach(encodedMIMEText('Part B'))
+    >>> message.attach(encoded_mime_text('Part A'))
+    >>> message.attach(encoded_mime_text('Part B'))
     >>> encrypted = encrypt(
     ...     message, recipients=['pgp-mime@invalid.com'], always_trust=True)
     >>> encrypted.set_boundary('boundsep')
@@ -177,41 +185,51 @@ def encrypt(message, recipients=None, always_trust=True):
     """
     body = message.as_string().encode('us-ascii')
     if recipients is None:
-        recipients = [email for name,email in _email_targets(message)]
-        _LOG.debug('extracted encryption recipients: {}'.format(recipients))
-    encrypted = str(_sign_and_encrypt_bytes(
-            data=body, recipients=recipients,
-            always_trust=always_trust), 'us-ascii')
-    enc = _MIMEApplication(
+        recipients = [email for name, email in email_targets(message)]
+        LOG.debug('extracted encryption recipients: {}'.format(recipients))
+    encrypted = str(
+        sign_and_encrypt_bytes(
+            data=body, recipients=recipients, always_trust=always_trust
+        ),
+        'us-ascii',
+    )
+    enc = MIMEApplication(
         _data=encrypted,
         _subtype='octet-stream; name="encrypted.asc"',
-        _encoder=_encode_7or8bit)
+        _encoder=encode_7or8bit,
+    )
     enc['Content-Description'] = 'OpenPGP encrypted message'
     enc.set_charset('us-ascii')
-    control = _MIMEApplication(
+    control = MIMEApplication(
         _data='Version: 1\n',
         _subtype='pgp-encrypted',
-        _encoder=_encode_7or8bit)
+        _encoder=encode_7or8bit,
+    )
     control.set_charset('us-ascii')
-    msg = _MIMEMultipart(
-        'encrypted',
-        micalg='pgp-sha1',
-        protocol='application/pgp-encrypted')
+    msg = MIMEMultipart(
+        'encrypted', micalg='pgp-sha1', protocol='application/pgp-encrypted'
+    )
     msg.attach(control)
     msg.attach(enc)
     msg['Content-Disposition'] = 'inline'
     return msg
 
-def sign_and_encrypt(message, signers=None, recipients=None,
-                     always_trust=False, allow_default_signer=False):
+
+def sign_and_encrypt(
+    message,
+    signers=None,
+    recipients=None,
+    always_trust=False,
+    allow_default_signer=False,
+):
     r"""Sign and encrypt a ``Message``, returning the encrypted version.
 
     multipart/encrypted
      +-> application/pgp-encrypted  (control information)
      +-> application/octet-stream   (body)
 
-    >>> from pgp_mime.email import encodedMIMEText
-    >>> message = encodedMIMEText('Hi\nBye')
+    >>> from pgp_mime.email import encoded_mime_text
+    >>> message = encoded_mime_text('Hi\nBye')
     >>> message['To'] = 'pgp-mime-test <pgp-mime@invalid.com>'
     >>> encrypted = sign_and_encrypt(
     ...     message, signers=['pgp-mime@invalid.com'], always_trust=True)
@@ -242,8 +260,8 @@ def sign_and_encrypt(message, signers=None, recipients=None,
 
     >>> from email.mime.multipart import MIMEMultipart
     >>> message = MIMEMultipart()
-    >>> message.attach(encodedMIMEText('Part A'))
-    >>> message.attach(encodedMIMEText('Part B'))
+    >>> message.attach(encoded_mime_text('Part A'))
+    >>> message.attach(encoded_mime_text('Part B'))
     >>> encrypted = sign_and_encrypt(
     ...     message, signers=['pgp-mime@invalid.com'],
     ...     recipients=['pgp-mime@invalid.com'], always_trust=True)
@@ -272,34 +290,42 @@ def sign_and_encrypt(message, signers=None, recipients=None,
     <BLANKLINE>
     --boundsep--
     """
-    _strip_bcc(message=message)
+    strip_bcc(message=message)
     body = message.as_string().encode('us-ascii')
     if recipients is None:
-        recipients = [email for name,email in _email_targets(message)]
-        _LOG.debug('extracted encryption recipients: {}'.format(recipients))
-    encrypted = str(_sign_and_encrypt_bytes(
-            data=body, signers=signers, recipients=recipients,
+        recipients = [email for name, email in email_targets(message)]
+        LOG.debug('extracted encryption recipients: {}'.format(recipients))
+    encrypted = str(
+        sign_and_encrypt_bytes(
+            data=body,
+            signers=signers,
+            recipients=recipients,
             always_trust=always_trust,
-            allow_default_signer=allow_default_signer), 'us-ascii')
-    enc = _MIMEApplication(
+            allow_default_signer=allow_default_signer,
+        ),
+        'us-ascii',
+    )
+    enc = MIMEApplication(
         _data=encrypted,
         _subtype='octet-stream; name="encrypted.asc"',
-        _encoder=_encode_7or8bit)
+        _encoder=encode_7or8bit,
+    )
     enc['Content-Description'] = 'OpenPGP encrypted message'
     enc.set_charset('us-ascii')
-    control = _MIMEApplication(
+    control = MIMEApplication(
         _data='Version: 1\n',
         _subtype='pgp-encrypted',
-        _encoder=_encode_7or8bit)
+        _encoder=encode_7or8bit,
+    )
     control.set_charset('us-ascii')
-    msg = _MIMEMultipart(
-        'encrypted',
-        micalg='pgp-sha1',
-        protocol='application/pgp-encrypted')
+    msg = MIMEMultipart(
+        'encrypted', micalg='pgp-sha1', protocol='application/pgp-encrypted'
+    )
     msg.attach(control)
     msg.attach(enc)
     msg['Content-Disposition'] = 'inline'
     return msg
+
 
 def _get_encrypted_parts(message):
     ct = message.get_content_type()
@@ -311,7 +337,7 @@ def _get_encrypted_parts(message):
     for part in message.get_payload():
         if part == message:
             continue
-        assert part.is_multipart() == False, part
+        assert part.is_multipart() is False, part
         ct = part.get_content_type()
         if ct == 'application/pgp-encrypted':
             if control:
@@ -328,6 +354,7 @@ def _get_encrypted_parts(message):
     if not body:
         raise ValueError('missing application/octet-stream part')
     return (control, body)
+
 
 def _get_signed_parts(message):
     ct = message.get_content_type()
@@ -354,11 +381,12 @@ def _get_signed_parts(message):
         raise ValueError('missing application/pgp-signature part')
     return (body, signature)
 
+
 def decrypt(message):
     r"""Decrypt a multipart/encrypted message.
 
-    >>> from pgp_mime.email import encodedMIMEText
-    >>> message = encodedMIMEText('Hi\nBye')
+    >>> from pgp_mime.email import encoded_mime_text
+    >>> message = encoded_mime_text('Hi\nBye')
     >>> encrypted = encrypt(message, recipients=['<pgp-mime@invalid.com>'])
     >>> decrypted = decrypt(encrypted)
     >>> print(decrypted.as_string())  # doctest: +ELLIPSIS, +REPORT_UDIFF
@@ -372,8 +400,8 @@ def decrypt(message):
 
     >>> from email.mime.multipart import MIMEMultipart
     >>> message = MIMEMultipart()
-    >>> message.attach(encodedMIMEText('Part A'))
-    >>> message.attach(encodedMIMEText('Part B'))
+    >>> message.attach(encoded_mime_text('Part A'))
+    >>> message.attach(encoded_mime_text('Part B'))
     >>> encrypted = encrypt(
     ...     message, recipients=['pgp-mime@invalid.com'], always_trust=True)
     >>> decrypted = decrypt(encrypted)
@@ -399,21 +427,25 @@ def decrypt(message):
     --boundsep--
     <BLANKLINE>
     """
-    control,body = _get_encrypted_parts(message)
+    control, body = _get_encrypted_parts(message)
     encrypted = body.get_payload(decode=True)
     if not isinstance(encrypted, bytes):
         encrypted = encrypted.encode('us-ascii')
-    decrypted,verified,result = _verify_bytes(encrypted)
-    return _message_from_bytes(decrypted)
+    decrypted, verified, result = verify_bytes(encrypted)
+    return message_from_bytes(decrypted)
+
 
 def verify(message):
     r"""Verify a signature on ``message``, possibly decrypting first.
 
-    >>> from pgp_mime.email import encodedMIMEText
-    >>> message = encodedMIMEText('Hi\nBye')
+    >>> from pgp_mime.email import encoded_mime_text
+    >>> message = encoded_mime_text('Hi\nBye')
     >>> message['To'] = 'pgp-mime-test <pgp-mime@invalid.com>'
-    >>> encrypted = sign_and_encrypt(message, signers=['pgp-mime@invalid.com'],
-    ...     always_trust=True)
+    >>> encrypted = sign_and_encrypt(
+    ...     message,
+    ...     signers=['pgp-mime@invalid.com'],
+    ...     always_trust=True
+    ... )
     >>> decrypted,verified,result = verify(encrypted)
     >>> print(decrypted.as_string())  # doctest: +ELLIPSIS, +REPORT_UDIFF
     Content-Type: text/plain; charset="us-ascii"
@@ -453,8 +485,8 @@ def verify(message):
 
     >>> from email.mime.multipart import MIMEMultipart
     >>> message = MIMEMultipart()
-    >>> message.attach(encodedMIMEText('Part A'))
-    >>> message.attach(encodedMIMEText('Part B'))
+    >>> message.attach(encoded_mime_text('Part A'))
+    >>> message.attach(encoded_mime_text('Part B'))
     >>> signed = sign(message, signers=['pgp-mime@invalid.com'])
     >>> decrypted,verified,result = verify(signed)
     >>> decrypted.set_boundary('boundsep')
@@ -506,16 +538,17 @@ def verify(message):
     """
     ct = message.get_content_type()
     if ct == 'multipart/encrypted':
-        control,body = _get_encrypted_parts(message)
+        control, body = _get_encrypted_parts(message)
         encrypted = body.get_payload(decode=True)
         if not isinstance(encrypted, bytes):
             encrypted = encrypted.encode('us-ascii')
-        decrypted,verified,message = _verify_bytes(encrypted)
-        return (_message_from_bytes(decrypted), verified, message)
-    body,signature = _get_signed_parts(message)
+        decrypted, verified, message = verify_bytes(encrypted)
+        return (message_from_bytes(decrypted), verified, message)
+    body, signature = _get_signed_parts(message)
     sig_data = signature.get_payload(decode=True)
     if not isinstance(sig_data, bytes):
         sig_data = sig_data.encode('us-ascii')
-    decrypted,verified,result = _verify_bytes(
-        body.as_string().encode('us-ascii'), signature=sig_data)
+    decrypted, verified, result = verify_bytes(
+        body.as_string().encode('us-ascii'), signature=sig_data
+    )
     return (body, verified, result)

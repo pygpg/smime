@@ -1,10 +1,9 @@
-# Copyright
+"""Manage SMTP."""
 
 import configparser as _configparser
 import smtplib as _smtplib
 
 from . import LOG as _LOG
-
 
 SENDMAIL = ['/usr/sbin/sendmail', '-t']
 
@@ -14,14 +13,18 @@ def get_smtp_params(config):
 
     >>> from configparser import ConfigParser
     >>> config = ConfigParser()
-    >>> config.read_string('\n'.join([
+    >>> config.read_string(
+    ...     '\n'.join(
+    ...         [
     ...             '[smtp]',
     ...             'host: smtp.mail.uu.edu',
     ...             'port: 587',
     ...             'starttls: yes',
     ...             'username: rincewind',
     ...             'password: 7ugg@g3',
-    ...             ]))
+    ...         ]
+    ...     )
+    ... )
     >>> get_smtp_params(config)
     ('smtp.mail.uu.edu', 587, True, 'rincewind', '7ugg@g3')
     >>> config = ConfigParser()
@@ -52,8 +55,10 @@ def get_smtp_params(config):
         password = None
     return (host, port, starttls, username, password)
 
-def get_smtp(host=None, port=None, starttls=None, username=None,
-             password=None):
+
+def get_smtp(
+    host=None, port=None, starttls=None, username=None, password=None
+):
     """Connect to an SMTP host using the given parameters.
 
     >>> import smtplib
@@ -72,7 +77,8 @@ def get_smtp(host=None, port=None, starttls=None, username=None,
         port = _smtplib.SMTP_PORT
     if username and not starttls:
         raise ValueError(
-            'sending passwords in the clear is unsafe!  Use STARTTLS.')
+            'sending passwords in the clear is unsafe!  Use STARTTLS.'
+        )
     _LOG.info('connect to SMTP server at {}:{}'.format(host, port))
     smtp = _smtplib.SMTP(host=host, port=port)
     smtp.ehlo()
@@ -80,8 +86,9 @@ def get_smtp(host=None, port=None, starttls=None, username=None,
         smtp.starttls()
     if username:
         smtp.login(username, password)
-    #smtp.set_debuglevel(1)
+    # smtp.set_debuglevel(1)
     return smtp
+
 
 def mail(message, smtp=None, sendmail=None):
     """Send an email ``Message`` instance on its merry way.
@@ -101,8 +108,10 @@ def mail(message, smtp=None, sendmail=None):
         smtp.send_message(msg=message)
     elif sendmail:
         execute(
-            sendmail, stdin=message.as_string().encode('us-ascii'),
-            close_fds=True)
+            sendmail,
+            stdin=message.as_string().encode('us-ascii'),
+            close_fds=True,
+        )
     else:
         smtp = _smtplib.SMTP()
         smtp.connect()

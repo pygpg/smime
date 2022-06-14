@@ -21,7 +21,6 @@ Uses ``pyassuan`` to connect to ``gpgme-tool`` for the cryptography.
 
 import logging as _logging
 
-
 __version__ = '0.3'
 
 
@@ -30,8 +29,16 @@ LOG.setLevel(_logging.ERROR)
 LOG.addHandler(_logging.StreamHandler())
 
 
-from .pgp import sign, encrypt, sign_and_encrypt, decrypt, verify
 from .email import (
-    header_from_text, guess_encoding, encodedMIMEText, strip_bcc, append_text,
-    attach_root, getaddresses, email_sources, email_targets)
-from .smtp import get_smtp_params, get_smtp, mail
+    append_text,
+    attach_root,
+    email_sources,
+    email_targets,
+    encodedMIMEText,
+    getaddresses,
+    guess_encoding,
+    header_from_text,
+    strip_bcc,
+)
+from .pgp import decrypt, encrypt, sign, sign_and_encrypt, verify
+from .smtp import get_smtp, get_smtp_params, mail

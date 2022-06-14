@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright (C) 2012 W. Trevor King <wking@drexel.edu>
 #
 # This file is part of pgp-mime.
@@ -15,20 +14,19 @@
 # You should have received a copy of the GNU General Public License along with
 # pgp-mime.  If not, see <http://www.gnu.org/licenses/>.
 
-from email.header import decode_header as _decode_header
-from email.message import Message as _Message
-from email.mime.text import MIMEText as _MIMEText
-from email.parser import Parser as _Parser
-from email.utils import formataddr as _formataddr
+from email.header import decode_header
+# from email.message import Message
+from email.mime.text import MIMEText
+from email.parser import Parser
+# from email.utils import formataddr
 from email.utils import getaddresses as _getaddresses
 
-
 ENCODING = 'utf-8'
-#ENCODING = 'iso-8859-1'
+# ENCODING = 'iso-8859-1'
 
 
 def header_from_text(text):
-    r"""Simple wrapper for instantiating a ``Message`` from text.
+    r"""Provide simple wrapper for instantiating a ``Message`` from text.
 
     >>> text = '\n'.join(
     ...     ['From: me@big.edu','To: you@big.edu','Subject: testing'])
@@ -41,8 +39,9 @@ def header_from_text(text):
     <BLANKLINE>
     """
     text = text.strip()
-    p = _Parser()
+    p = Parser()
     return p.parsestr(text, headersonly=True)
+
 
 def guess_encoding(text):
     r"""
@@ -60,10 +59,11 @@ def guess_encoding(text):
             return encoding
     raise ValueError(text)
 
-def encodedMIMEText(body, encoding=None):
+
+def encoded_mime_txt(body, encoding=None):
     """Wrap ``MIMEText`` with ``guess_encoding`` detection.
 
-    >>> message = encodedMIMEText('Hello')
+    >>> message = encoded_mime_txt('Hello')
     >>> print(message.as_string())  # doctest: +REPORT_UDIFF
     Content-Type: text/plain; charset="us-ascii"
     MIME-Version: 1.0
@@ -71,7 +71,7 @@ def encodedMIMEText(body, encoding=None):
     Content-Disposition: inline
     <BLANKLINE>
     Hello
-    >>> message = encodedMIMEText('Джон Доу')
+    >>> message = encoded_mime_txt('Джон Доу')
     >>> print(message.as_string())  # doctest: +REPORT_UDIFF
     Content-Type: text/plain; charset="utf-8"
     MIME-Version: 1.0
@@ -81,20 +81,21 @@ def encodedMIMEText(body, encoding=None):
     0JTQttC+0L0g0JTQvtGD
     <BLANKLINE>
     """
-    if encoding == None:
+    if encoding is None:
         encoding = guess_encoding(body)
     if encoding == 'us-ascii':
-        message = _MIMEText(body)
+        message = MIMEText(body)
     else:
         # Create the message ('plain' stands for Content-Type: text/plain)
-        message = _MIMEText(body, 'plain', encoding)
+        message = MIMEText(body, 'plain', encoding)
     message.add_header('Content-Disposition', 'inline')
     return message
 
-def strip_bcc(message):
-    """Remove the Bcc field from a ``Message`` in preparation for mailing
 
-    >>> message = encodedMIMEText('howdy!')
+def strip_bcc(message):
+    """Remove the Bcc field from a ``Message`` in preparation for mailing.
+
+    >>> message = encoded_mime_txt('howdy!')
     >>> message['To'] = 'John Doe <jdoe@a.gov.ru>'
     >>> message['Bcc'] = 'Jack <jack@hill.org>, Jill <jill@hill.org>'
     >>> message = strip_bcc(message)
@@ -111,12 +112,13 @@ def strip_bcc(message):
     del message['resent-bcc']
     return message
 
+
 def append_text(text_part, new_text):
     r"""Append text to the body of a ``plain/text`` part.
 
     Updates encoding as necessary.
 
-    >>> message = encodedMIMEText('Hello')
+    >>> message = encoded_mime_txt('Hello')
     >>> append_text(message, ' John Doe')
     >>> print(message.as_string())  # doctest: +REPORT_UDIFF
     Content-Type: text/plain; charset="us-ascii"
@@ -146,7 +148,8 @@ def append_text(text_part, new_text):
     """
     original_encoding = text_part.get_charset().input_charset
     original_payload = str(
-        text_part.get_payload(decode=True), original_encoding)
+        text_part.get_payload(decode=True), original_encoding
+    )
     new_payload = '{}{}'.format(original_payload, new_text)
     new_encoding = guess_encoding(new_payload)
     if text_part.get('content-transfer-encoding', None):
@@ -154,11 +157,12 @@ def append_text(text_part, new_text):
         del text_part['content-transfer-encoding']
     text_part.set_payload(new_payload, new_encoding)
 
+
 def attach_root(header, root_part):
     r"""Copy headers from ``header`` onto ``root_part``.
 
     >>> header = header_from_text('From: me@big.edu\n')
-    >>> body = encodedMIMEText('Hello')
+    >>> body = encoded_mime_txt('Hello')
     >>> message = attach_root(header, body)
     >>> print(message.as_string())  # doctest: +REPORT_UDIFF
     Content-Type: text/plain; charset="us-ascii"
@@ -169,12 +173,13 @@ def attach_root(header, root_part):
     <BLANKLINE>
     Hello
     """
-    for k,v in header.items():
+    for k, v in header.items():
         root_part[k] = v
-    return root_part    
+    return root_part
+
 
 def getaddresses(addresses):
-    """A decoding version of ``email.utils.getaddresses``.
+    """Provide a decoding version of ``email.utils.getaddresses``.
 
     >>> text = ('To: =?utf-8?b?0JTQttC+0L0g0JTQvtGD?= <jdoe@a.gov.ru>, '
     ...     'Jack <jack@hill.org>')
@@ -182,17 +187,18 @@ def getaddresses(addresses):
     >>> list(getaddresses(header.get_all('to', [])))
     [('Джон Доу', 'jdoe@a.gov.ru'), ('Jack', 'jack@hill.org')]
     """
-    for (name,address) in _getaddresses(addresses):
+    for (name, address) in _getaddresses(addresses):
         n = []
-        for b,encoding in _decode_header(name):
+        for b, encoding in decode_header(name):
             if encoding is None:
                 n.append(b)
             else:
                 n.append(str(b, encoding))
         yield (' '.join(n), address)
 
+
 def email_sources(message):
-    """Extract author address from an email ``Message``
+    """Extract author address from an email ``Message``.
 
     Search the header of an email Message instance to find the
     senders' email addresses (or sender's address).
@@ -204,10 +210,11 @@ def email_sources(message):
     [('Джон Доу', 'jdoe@a.gov.ru'), ('Jack', 'jack@hill.org')]
     """
     froms = message.get_all('from', [])
-    return getaddresses(froms) # [(name, address), ...]
+    return getaddresses(froms)  # [(name, address), ...]
+
 
 def email_targets(message):
-    """Extract recipient addresses from an email ``Message``
+    """Extract recipient addresses from an email ``Message``.
 
     Search the header of an email Message instance to find a
     list of recipient's email addresses.
@@ -225,4 +232,5 @@ def email_targets(message):
     resent_ccs = message.get_all('resent-cc', [])
     resent_bccs = message.get_all('resent-bcc', [])
     return getaddresses(
-        tos + ccs + bccs + resent_tos + resent_ccs + resent_bccs)
+        tos + ccs + bccs + resent_tos + resent_ccs + resent_bccs
+    )

@@ -10,8 +10,8 @@ readme = "README.rst"
 license = {file = "LICENSE"}
 requires-python = ">=3.6"
 authors = [
-    {name = "W. Trevor King", email = "wking@tremily.us"},
-    {name = "Jesse P. Johnson", email = "jpj6652@gmail.com"}
+    {name = "Jesse P. Johnson", email = "jpj6652@gmail.com"},
+    {name = "W. Trevor King", email = "wking@tremily.us"}
 ]
 maintainers = [{name = "Jesse P. Johnson", email = "jpj6652@gmail.com"}]
 classifiers = [
@@ -77,7 +77,7 @@ exclude = '''
   /(
     | \.git
     | \.mypy_cache
-    | _build
+    | build
     | dist
   )
 )
