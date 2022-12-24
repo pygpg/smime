@@ -1,19 +1,20 @@
-#!/usr/bin/env python3
-# Copyright (C) 2012 W. Trevor King <wking@drexel.edu>
+#!/usr/bin/env python3.3
+# Copyright (C) 2022 Jesse P. Johnson <jpj6652@gmail.com>
+# Copyright (C) 2012 W. Trevor King <wking@tremily.us>
 #
-# This file is part of pgp-mime.
+# This file is part of assuan-smime.
 #
-# pgp-mime is free software: you can redistribute it and/or modify it under the
+# assuan-smime is free software: you can redistribute it and/or modify it under the
 # terms of the GNU General Public License as published by the Free Software
 # Foundation, either version 3 of the License, or (at your option) any later
 # version.
 #
-# pgp-mime is distributed in the hope that it will be useful, but WITHOUT ANY
+# assuan-smime is distributed in the hope that it will be useful, but WITHOUT ANY
 # WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
 # A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
 #
 # You should have received a copy of the GNU General Public License along with
-# pgp-mime.  If not, see <http://www.gnu.org/licenses/>.
+# assuan-smime.  If not, see <http://www.gnu.org/licenses/>.
 
 """Scriptable PGP MIME email using ``gpg``.
 
@@ -28,62 +29,64 @@ in your shell before invoking this script.  See ``gpg-agent(1)`` for
 more details.
 """
 
-import codecs as _codecs
-import configparser as _configparser
-import logging as _logging
-import mimetypes as _mimetypes
-import os.path as _os_path
-import sys as _sys
+import codecs
+import logging
+import mimetypes
+import os
+import sys
+from configparser import ConfigParser
+from email.encoders import encode_base64
+from email.mime.application import MIMEApplication
+from email.mime.audio import MIMEAudio
+from email.mime.image import MIMEImage
+from email.mime.multipart import MIMEMultipart
+from email.mime.nonmultipart import MIMENonMultipart
+from typing import Optional
 
-from email.encoders import encode_base64 as _encode_base64
-from email.mime.application import MIMEApplication as _MIMEApplication
-from email.mime.audio import MIMEAudio as _MIMEAudio
-from email.mime.image import MIMEImage as _MIMEImage
-from email.mime.multipart import MIMEMultipart as _MIMEMultipart
-from email.mime.nonmultipart import MIMENonMultipart as _MIMENonMultipart
+from assuan import smime
 
-import pgp_mime as _pgp_mime
-
+log = logging.getLogger(__name__)
 
 STDIN_USED = False
 
 
-def read_file(filename=None, encoding='us-ascii'):
+def read_file(filename: Optional[str] = None, encoding: str = 'us-ascii'):
     global STDIN_USED
     if filename == '-':
-        assert STDIN_USED == False, STDIN_USED
+        assert STDIN_USED is False, STDIN_USED
         STDIN_USED = True
-        return _sys.stdin.read()
+        return sys.stdin.read()
     if filename:
-        return _codecs.open(filename, 'r', encoding).read()
+        return codecs.open(filename, 'r', encoding).read()
     raise ValueError('neither filename nor descriptor given for reading')
 
 
-def load_attachment(filename, encoding='us-ascii'):
-    mimetype, content_encoding = _mimetypes.guess_type(filename)
+def load_attachment(filename: str, encoding: str = 'us-ascii'):
+    mimetype, content_encoding = mimetypes.guess_type(filename)
     if mimetype is None or content_encoding is not None:
         mimetype = 'application/octet-stream'
     maintype, subtype = mimetype.split('/', 1)
-    _pgp_mime.LOG.info(
-        'loading attachment {} as {} ({})'.format(
-            filename, mimetype, content_encoding
-        )
+    log.info(
+        'loading attachment %s as %s (%s)',
+        filename,
+        mimetype,
+        content_encoding,
     )
     if maintype == 'text':
         text = read_file(filename=filename, encoding=encoding)
-        attachment = _pgp_mime.encodedMIMEText(text)
+        attachment = smime.EncodedMIMEText(text)
         del attachment['content-disposition']
     else:
         data = open(filename, 'rb').read()
         if maintype == 'application':
-            attachment = _MIMEApplication(data, subtype)
+            attachment = MIMEApplication(data, subtype)
         elif maintype == 'audio':
-            attachment = _MIMEAudio(data)
+            attachment = MIMEAudio(data)
         elif maintype == 'image':
-            attachment = _MIMEImage(data)
+            attachment = MIMEImage(data)
         else:
-            attachment = _MIMENonMultipary(maintype, subtype)
-            attachment.set_payload(data, _encode_base64)
+            attachment = MIMENonMultipart(maintype, subtype)
+            attachment.set_payload(data, encode_base64)
     attachment.add_header(
         'Content-Disposition', 'attachment', filename=filename
     )
@@ -97,8 +100,13 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(
         description=doc_lines[0],
         epilog='\n'.join(doc_lines[1:]).strip(),
-        version=_pgp_mime.__version__,
         formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    parser.add_argument(
+        '-v',
+        '--version',
+        action='version',
+        version='%(prog)s {}'.format(smime.__version__),
     )
     parser.add_argument(
         '-e',
@@ -141,8 +149,8 @@ if __name__ == '__main__':
         '-c',
         '--config',
         metavar='FILE',
-        default=_os_path.expanduser(
-            _os_path.join('~', '.config', 'smtplib.conf')
+        default=os.path.expanduser(
+            os.path.join('~', '.config', 'smtplib.conf')
         ),
         help='SMTP config file for sending mail',
     ),
@@ -163,55 +171,59 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     if args.verbose:
-        _pgp_mime.LOG.setLevel(
-            max(_logging.DEBUG, _pgp_mime.LOG.level - 10 * args.verbose)
-        )
+        log.setLevel(max(logging.DEBUG, log.level - 10 * args.verbose))
 
     header_text = read_file(filename=args.header_file, encoding=args.encoding)
-    header = _pgp_mime.header_from_text(header_text)
+    header = smime.header_from_text(header_text)
     body_text = read_file(filename=args.body_file, encoding=args.encoding)
-    body = _pgp_mime.encodedMIMEText(body_text)
+    body = smime.encodedMIMEText(body_text)
     if args.attachment:
-        b = _MIMEMultipart()
+        b = MIMEMultipart()
         b.attach(body)
         body = b
-        _mimetypes.init()
+        mimetypes.init()
         for attachment in args.attachment:
             body.attach(
                 load_attachment(filename=attachment, encoding=args.encoding)
             )
+
+    config = ConfigParser()
+    config.read(args.config)
+    client_params = smime.get_client_params(config)
+
     if args.sign_as:
         signers = [args.sign_as]
     else:
         signers = None
     if 'encrypt' in args.mode:
-        recipients = [email for name, email in _pgp_mime.email_targets(header)]
+        recipients = [email for name, email in smime.email_targets(header)]
     if args.mode == 'sign':
-        body = _pgp_mime.sign(body, signers=signers, allow_default_signer=True)
+        body = smime.sign(
+            body, signers=signers, allow_default_signer=True, **client_params
+        )
     elif args.mode == 'encrypt':
-        body = _pgp_mime.encrypt(body, recipients=recipients)
+        body = smime.encrypt(body, recipients=recipients, **client_params)
     elif args.mode == 'sign-encrypt':
-        body = _pgp_mime.sign_and_encrypt(
+        body = smime.sign_and_encrypt(
             body,
             signers=signers,
             recipients=recipients,
             allow_default_signer=True,
+            **client_params
         )
     elif args.mode == 'plain':
         pass
     else:
         raise Exception('unrecognized mode {}'.format(args.mode))
-    message = _pgp_mime.attach_root(header, body)
+    message = smime.attach_root(header, body)
 
     if args.output:
         print(message.as_string())
     else:
-        config = _configparser.ConfigParser()
-        config.read(args.config)
-        params = _pgp_mime.get_smtp_params(config)
-        smtp = _pgp_mime.get_smtp(*params)
+        smtp_params = smime.get_smtp_params(config)
+        smtp = smime.get_smtp(*smtp_params)
         try:
-            _pgp_mime.mail(message, smtp)
+            smime.mail(message, smtp)
         finally:
-            _pgp_mime.LOG.info('disconnect from SMTP server')
+            log.info('disconnect from SMTP server')
             smtp.quit()

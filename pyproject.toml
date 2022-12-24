@@ -3,15 +3,15 @@ requires = ["setuptools>=61.0.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "pygpg-smime"
-version = "0.2.0"
+name = "assuan-smime"
+version = "0.3"
 description = "Tools for using Gnu Privacy Guard (GPG) with email."
 readme = "README.rst"
 license = {file = "LICENSE"}
 requires-python = ">=3.6"
 authors = [
     {name = "Jesse P. Johnson", email = "jpj6652@gmail.com"},
-    {name = "W. Trevor King", email = "wking@tremily.us"}
+    {name = "W. Trevor King", email = "wking@tremily.us"},
 ]
 maintainers = [{name = "Jesse P. Johnson", email = "jpj6652@gmail.com"}]
 classifiers = [
@@ -25,44 +25,71 @@ classifiers = [
     "Programming Language :: Python :: 3.8",
     "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
     "Topic :: Communications :: Email",
     "Topic :: Security :: Cryptography",
-    "Topic :: Software Development"
+    "Topic :: Software Development",
 ]
 dependencies = [
-    # "pyassuan==0.2.0",
-    # "pypgp-assuan"
+    # "chardet>=5,<6",
+    "assuan>=0.2.1b1,<1",
 ]
 
 [project.optional-dependencies]
-test = [
+dev = [
+    "build>=0.7.0,<1",
+    "proman-versioning>=0.5.0-alpha.2",
     "flake8>=3.8.3,<4",
-    "tox>=3.24.0,<4",
-    "mypy>=0.910,<1",
+    "mypy>=0.942,<1",
     "pylint>=2.9.5,<3",
-    "nose2[coverage_plugin]>=0.11.0,<1",
-]
-doc = [
-    "doc8>=0.11.2,<1",
-    "docstr-coverage>=1.2.0,<2",
-    "pydocstyle[toml]>=6.1.1,<7"
-]
-format = [
     "click==8.0.4",
     "black==22.1.0",
-    "isort>=5.9.2,<6"
+    "isort>=5.9.2,<6",
+    "bandit>=1.6.2",
+    "safety>=1.9",
+    "pytest>=7",
+    "pytest-cov>=2.10",
+    "tox>=3.24.0,<4",
+    "twine>=4.0.2,<5",
 ]
-build = [
-    "build>=0.7.0,<1",
-    "wheel>=0.37.1,<1"
+docs = [
+    "sphinx>=5.3",
+    "sphinx-autodoc-typehints>=1.19.5",
+    "doc8>=0.11.2,<1",
+    "docstr-coverage>=1.2.0,<2",
+    "pydocstyle[toml]>=6.1.1,<7",
 ]
 
 [project.urls]
-homepage = "http://blog.tremily.us/posts/pgp-mime/"
-repository = "https://github.com/wking/pgp-mime.git"
+homepage = "http://github.com/pygpg/smime/"
+repository = "https://github.com/pygpg/smime.git"
+
+[tool.setuptools]
+packages = ["assuan.smime"]
+
+[tool.setuptools.package-dir]
+"assuan.smime" = "src/assuan/smime"
+
+[tool.proman.versioning]
+enable_devreleases = false
+
+[[tool.proman.versioning.files]]
+filepath = "pyproject.toml"
+pattern = "version = \"${version}\""
+
+[[tool.proman.versioning.files]]
+filepath = "src/smime/__init__.py"
+pattern = "__version__ = '${version}'"
+
+[[tool.proman.versioning.files]]
+filepath = "tests/test_version.py"
+pattern = "__version__ == '${version}'"
 
 [tool.pydocstyle]
-ignore = ["D203", "D213"]
+ignore = [
+    "D203",
+    "D213",
+]
 
 [tool.isort]
 profile = "black"
@@ -88,3 +115,22 @@ warn_redundant_casts = true
 warn_unused_ignores = true
 disallow_untyped_defs = true
 ignore_missing_imports = true
+
+# [tool.pylint]
+# fail-under = 9.0
+
+[tool.pylint."MESSAGES CONTROL"]
+disable = [
+    "R0903",
+    "C0103",
+    "W0715",
+]
+
+[tool.pylint."FORMAT"]
+max-line-length = 79
+
+[tool.pylint."MISCELLANEOUS"]
+notes = []
+
+[tool.pytest.ini_options]
+addopts = "--doctest-modules"
